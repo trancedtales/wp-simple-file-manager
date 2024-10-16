@@ -11,7 +11,7 @@ License: GPL2
 
 // Enqueue scripts and styles
 function sfm_enqueue_scripts() {
-    wp_enqueue_script('sfm-file-manager', plugin_dir_url(__FILE__) . 'file-manager.js', array('jquery'), '1.0', true);
+    wp_enqueue_script('sfm-file-manager', plugin_dir_url(__FILE__) . 'file-manager.js', array('jquery'), '1.1', true);
     wp_enqueue_style('sfm-file-manager', plugin_dir_url(__FILE__) . 'style.css');
 }
 
@@ -42,11 +42,55 @@ function sfm_file_manager_page() {
         
         <!-- Add search input -->
         <input type="text" id="file-search" placeholder="Search files..." style="margin-top: 20px;" />
+
+        <div id="directory-navigation">
+            <button id="go-up">Go Up</button>
+            <span id="current-directory"></span>
+        </div>
         
         <div id="file-list"></div>
     </div>
     <?php
 }
+
+// List files and directories
+function sfm_list_files() {
+    check_ajax_referer('sfm_upload_nonce', 'security');
+
+    $directory = isset($_POST['directory']) ? sanitize_text_field($_POST['directory']) : '';
+    $upload_dir = wp_upload_dir();
+    $base_dir = $upload_dir['basedir']; // Start in uploads directory
+
+    $directory = realpath($base_dir . '/' . $directory);
+
+    // Ensure we only allow browsing within the base directory
+    if (strpos($directory, realpath($base_dir)) !== 0) {
+        wp_send_json_error('Unauthorized directory access.');
+    }
+
+    $files = scandir($directory);
+    if (!$files) {
+        wp_send_json_error('Unable to read directory.');
+    }
+
+    $file_list = array();
+    foreach ($files as $file) {
+        if ($file == '.' || $file == '..') {
+            continue;
+        }
+
+        $file_path = $directory . '/' . $file;
+        $file_list[] = array(
+            'name' => $file,
+            'path' => str_replace($base_dir, '', $file_path),
+            'is_dir' => is_dir($file_path)
+        );
+    }
+
+    wp_send_json_success($file_list);
+}
+
+add_action('wp_ajax_sfm_list_files', 'sfm_list_files');
 
 // Handle file uploads
 function sfm_handle_file_upload() {
@@ -54,10 +98,11 @@ function sfm_handle_file_upload() {
 
     $uploaded_file = $_FILES['file'];
     $upload_dir = wp_upload_dir();
-    $target_path = $upload_dir['path'] . '/' . basename($uploaded_file['name']);
+    $current_directory = isset($_POST['current_directory']) ? sanitize_text_field($_POST['current_directory']) : '';
+    $target_path = $upload_dir['path'] . '/' . $current_directory . '/' . basename($uploaded_file['name']);
 
     if (move_uploaded_file($uploaded_file['tmp_name'], $target_path)) {
-        wp_send_json_success(array('file_url' => $upload_dir['url'] . '/' . basename($uploaded_file['name'])));
+        wp_send_json_success(array('file_url' => $upload_dir['url'] . '/' . $current_directory . '/' . basename($uploaded_file['name'])));
     } else {
         wp_send_json_error('Error uploading file.');
     }
