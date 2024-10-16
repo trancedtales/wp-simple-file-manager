@@ -1,0 +1,20 @@
+#file-list {
+    margin-top: 20px;
+}
+
+.file-item {
+    margin-bottom: 10px;
+}
+
+.file-item a {
+    margin-right: 10px;
+}
+
+#file-search {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 20px;
+    font-size: 16px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
